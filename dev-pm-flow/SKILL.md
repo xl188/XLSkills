@@ -1,7 +1,7 @@
 ---
 name: dev-pm-flow
 description: "开发 PM 流程：需求拆解(垂直切片)→方案→确认→执行→自审(双轴)→交付。用户提开发需求时触发。"
-version: 1.3.4
+version: 1.3.5
 author: 小艾
 platforms: [linux, macos, windows]
 metadata:
@@ -82,6 +82,15 @@ git stash push -u -m "pre-dev checkpoint $(date +%Y%m%d_%H%M%S)"
 - 用 `patch`（精确替换）或 `write_file`（整文件重写）改代码
 - **执行中遇难缠 bug → 先建复现闭环**（联动 `systematic-debugging`）：失败测试 / curl / 最小复现，要求秒级、确定性、能抓住这个具体 bug；**无闭环不假设**，禁止边猜边改。修前先写回归测试；没有正确的测试接缝时，"没有接缝"本身记入交付说明
 - **并行任务文件隔离**：多个子代理并行时，拆分任务必须保证不交叉改同一文件；如果必须改同一文件，改为串行执行，后写的等前一个完成再改
+
+### subagent 派发防研究过度（2026-08-13 切片 4 两连踩坑定版）
+
+派 subagent 开发最容易翻车的不是写错，是**研究过度**——面对框架细节/样式惯例这类"未知"，subagent 倾向先研究透再动手（反编译 DLL、读 node_modules 内部源码、反复 grep 主题变量），几十次工具调用耗尽、代码没写完就到上限。四件套防：
+
+1. **结论给"锚点"不给"模糊先例"**：写死"直接照抄 `XxxService.cs` 第 N 行的 `[ApiDescriptionSettings(Name = "a/b")]` 写法"，不要写"参照现有先例"——后者会触发 subagent 自己去找先例、去验证、去反编译。
+2. **已调研结论喂饱，不留空白**：subagent 可能想研究的点（组件 props、响应字段、样式惯例、路由规则）全部写进 context，并加一句"以上结论已实测，直接采用，无需验证"。
+3. **context 末尾加"预算 + 禁止清单"**：写"本任务约 N 文件 ~X 行，预期 ≤M 次工具调用，请直接写代码；禁止：反编译 DLL、读 node_modules 内部源码、反复 grep 主题/样式变量、读框架 GitHub 源码"。
+4. **任务切分更小**：单个 subagent 交付 ≤ 1 个 Service（或 ≤ 2 个前端文件）。"后端 6 接口 + 前端 2 文件"这种要拆 2 个 subagent（后端一个、前端一个），别让一个 subagent 扛到一半触上限。
 
 ## ⑤ 自审（= Review 环节）
 
