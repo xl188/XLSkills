@@ -1,7 +1,7 @@
 ---
 name: requesting-code-review
 description: "双轴 pre-commit review: Standards轴(安全/质量/规范) + Spec轴(对照需求查缺漏/蔓延/领域错误)，两轴分开报告。改动完成/commit前/交付前触发；🟡🔴改动由dev-pm-flow联动。"
-version: 2.3.3
+version: 2.3.4
 author: Hermes Agent (adapted from obra/superpowers + MorAlekss)
 license: MIT
 platforms: [linux, macos, windows]
@@ -128,16 +128,31 @@ Quick scan before dispatching the reviewer:
 ## Step 5 — Independent reviewer subagents (双轴并行)
 
 Call `delegate_task` directly — it is NOT available inside execute_code or scripts.
-**两个审查子代理并行派发，上下文互相隔离，报告分开呈现、不合并排名**——防止"代码写得很规范但做错了事"被掩盖（mattpocock/skills 双轴审查设计）。
+**必须单次 `delegate_task(tasks=[...])` batch 调用同时派发双轴（5a 与 5b 是 tasks 数组的两个元素），禁止拆成两次独立 `delegate_task` 调用或串行等待**——拆开调用会导致实际只有 1 个子代理在跑，双轴审查退化为单轴（实测教训）。两个审查子代理上下文互相隔离，报告分开呈现、不合并排名——防止"代码写得很规范但做错了事"被掩盖（mattpocock/skills 双轴审查设计）。审查子代理**不传 toolsets**（diff 与扫描结果已贴进 context，禁止工具调用；且子代理有 60s 硬超时，自身检索会超）。
 
 ### 5a. Standards 轴 — 独立质量/安全审查
 
 The reviewer gets ONLY the diff and static scan results. No shared context with
 the implementer. Fail-closed: unparseable response = fail.
 
+### 5b. Spec 轴 — 对照需求原文的合规审查
+
+**Spec 轴查三件事**（每一条必须引用需求原文/验收标准作为依据）：
+1. **缺需求** — 需求里明确要的，没做或只做了一半
+2. **范围蔓延** — 干了需求没让干的（多余功能/字段/重构）
+3. **领域错误** — 看着实现了，但实现逻辑与需求意图不符（这类是业务方最在意的领域问题，如「表单字段联动计算缺失」「状态流转条件与业务规则相反」）
+
+需求原文来源（按优先级）：项目根 `.hermes/plans/` 方案存档 → 对话中确认过的需求描述 → 用户传入的 spec/issue 文本。**存档位置规则以 dev-pm-flow ③ 为准：项目根目录（如 `<your-project>/.hermes/plans/...`），非用户主目录（`~/.hermes`）。** 没有需求原文时：跳过 Spec 轴，在最终报告中注明"无 spec 可对照"，绝不硬编一份需求出来。
+
+Spec 子代理拿到的东西：需求原文全文 + diff 全文（贴进 context，禁止工具调用——子代理 60s 硬超时，靠自身检索会超）。
+
+**单次 batch 调用（双轴合并为一个 tasks 数组，照抄此结构，一次发出）：**
+
 ```python
 delegate_task(
-    goal="""You are an independent code reviewer. You have no context about how
+    tasks=[
+        {
+            "goal": """You are an independent code reviewer. You have no context about how
 these changes were made. Review the git diff and return ONLY valid JSON.
 
 FAIL-CLOSED RULES:
@@ -179,26 +194,10 @@ Return ONLY this JSON:
   "suggestions": [],
   "summary": "one sentence verdict"
 }""",
-    context="Independent code review. Return only JSON verdict."
-)
-```
-
-> 注：审查子代理**不传 toolsets**（diff 与扫描结果已贴进 context，禁止工具调用；且子代理有 60s 硬超时，自身检索会超）。
-
-### 5b. Spec 轴 — 对照需求原文的合规审查
-
-**Spec 轴查三件事**（每一条必须引用需求原文/验收标准作为依据）：
-1. **缺需求** — 需求里明确要的，没做或只做了一半
-2. **范围蔓延** — 干了需求没让干的（多余功能/字段/重构）
-3. **领域错误** — 看着实现了，但实现逻辑与需求意图不符（这类是业务方最在意的领域问题，如「表单字段联动计算缺失」「状态流转条件与业务规则相反」）
-
-需求原文来源（按优先级）：项目根 `.hermes/plans/` 方案存档 → 对话中确认过的需求描述 → 用户传入的 spec/issue 文本。**存档位置规则以 dev-pm-flow ③ 为准：项目根目录（如 `<your-project>/.hermes/plans/...`），非用户主目录（`~/.hermes`）。** 没有需求原文时：跳过 Spec 轴，在最终报告中注明"无 spec 可对照"，绝不硬编一份需求出来。
-
-Spec 子代理拿到的东西：需求原文全文 + diff 全文（贴进 context，禁止工具调用——子代理 60s 硬超时，靠自身检索会超）。
-
-```python
-delegate_task(
-    goal="""You are an independent SPEC-COMPLIANCE reviewer (Spec axis).
+            "context": "Independent code review. Return only JSON verdict."
+        },
+        {
+            "goal": """You are an independent SPEC-COMPLIANCE reviewer (Spec axis).
 You have NO context about how these changes were made. You check ONLY
 whether the code matches the originating requirement — not code quality
 (that is the Standards axis, a separate reviewer).
@@ -229,7 +228,9 @@ Return ONLY this JSON:
   "wrong_implementations": [],
   "summary": "one sentence verdict"
 }""",
-    context="Independent spec-compliance review. Return only JSON verdict."
+            "context": "Independent spec-compliance review. Return only JSON verdict."
+        }
+    ]
 )
 ```
 
@@ -332,4 +333,5 @@ tests exist, tests pass, no regressions.
 - **Lint tools not installed** — skip that check silently, don't fail
 - **Auto-fix introduces new issues** — counts as a new failure, cycle continues
 - **未覆盖栈无内置 pattern** — pattern 库按 references/<栈>.md 组织；项目技术栈没有对应参考文件时，明说"该栈无内置 pattern"并手动补，绝不假装扫过
+- **双轴必须单次 tasks 数组发出** — 拆成两次 delegate_task 调用或串行等待 = 只有 1 个子代理在跑，双轴退化为单轴（实测教训）
 - **绝不 git commit** — 本技能只报告结论，commit 由用户手动（dev-pm-flow 铁律）
