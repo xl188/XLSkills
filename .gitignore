@@ -1,0 +1,6 @@
+data/
+__pycache__/
+*.pyc
+.api_key
+intent_url.txt
+_archive/
