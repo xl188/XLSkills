@@ -33,8 +33,6 @@ Copy-Item dev-pm-flow, requesting-code-review, systematic-debugging -Destination
 
 也可逐个导入 Hermes 桌面端：设置 → Skills → Import。
 
-> 国内直连 GitHub 可能超时，可走代理 clone：`git -c http.proxy=***REMOVED*** clone ...`
-
 ## 依赖
 
 - `requesting-code-review` 与 `dev-pm-flow` 相互联动（自审环节触发双轴审查）
