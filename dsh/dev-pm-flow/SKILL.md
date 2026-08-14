@@ -1,16 +1,16 @@
 ---
-name: dev-pm-flow
-description: "开发 PM 流程：需求拆解(垂直切片)→方案→确认→执行→自审(双轴)→交付。用户提开发需求时触发。"
-version: 1.4.1
-author: 小艾
+name: dsh-dev-pm-flow
+description: "开发 PM 流程（DSH 版）：需求拆解(垂直切片)→方案→确认(plan mode)→并行执行→自审(双轴)→交付。用户提开发需求时触发。"
+whenToUse: "用户提开发需求（后端接口/前端页面/bug 修复/配置/脚本/数据库变更）时。纯问答、查资料、写文档不触发；用户说'直接改/随便弄'时跳过确认但仍走自审。"
+version: 1.0.0-dsh
+author: 小艾 (adapted for DeepSeek Harness)
 platforms: [linux, macos, windows]
 metadata:
-  hermes:
-    tags: [development, pm, workflow, planning, execution, review]
-    related_skills: [requesting-code-review, test-driven-development]
+  tags: [development, pm, workflow, planning, execution, review]
+  related_skills: [dsh-requesting-code-review, dsh-systematic-debugging]
 ---
 
-# 开发 PM 流程
+# 开发 PM 流程（DSH 版）
 
 用户提开发需求时，按此流程走。我是 PM 兼执行者，用户是唯一的方案拍板人和最终验收人。
 
@@ -22,32 +22,29 @@ metadata:
 
 **任何一步卡住都可以向上回退。方案未确认，绝不动手。**
 
----
-
 ## ① 需求理解
 
 - 复述需求，确认我理解对了（一句话说清"做什么、为什么"）
-- 有歧义直接问，不猜
+- 有歧义用 `ask_user_question` 直接问，不猜
 
 ## ② 拆解 + 方案
 
-- 读相关代码 / 配置，摸清现状
-- 拆成具体任务步骤（改哪些文件、加什么逻辑、什么顺序）
-- **垂直切片原则**：每张任务票 = 一条**贯穿所有层、可独立验证的端到端切片**（能单独演示/验收），不是只切一层的水平切片；每张票带**验收标准**和**阻塞关系**（blocked by 哪些票；无阻塞的票可立即开工）
+- 用 `grep` / `glob` / `read` 读相关代码 / 配置，摸清现状
+- 拆成具体任务步骤，用 `todo_write` 建任务票；每张票 = 一条**贯穿所有层、可独立验证的端到端垂直切片**（能单独演示/验收），带**验收标准**和**阻塞关系**（blocked by 哪些票；无阻塞的票可立即开工）
 - **大重构走 expand-contract**（波及全库的机械改动，如改列名/共享类型/迁移）：先加新形态与旧形态并存 → 按爆炸半径分批迁移（每批一张票，保持可编译）→ 最后删旧形态。禁止一把梭
 - **任务分级**：
-  - 🟢 **轻量**（单文件 / <10 行 / 配置改动）→ 我直接 `patch`，不走子代理
+  - 🟢 **轻量**（单文件 **且** 机械改动 **且** <10 行 / 纯配置）→ 我直接 `edit`/`write`，不走子代理
   - 🟡 **中等**（2-3 文件 / 新增函数或接口）→ 我自己写，派子代理审查
-  - 🔴 **重型**（多文件重构 / 新模块 / 复杂算法）→ 子代理并行开发，或建议上编码 agent
+  - 🔴 **重型**（多文件重构 / 新模块 / 复杂算法）→ **并行子代理开发**（见 ④），或建议上编码 agent
 - 方案输出格式：目标 + 改动清单 + 涉及文件 + 风险点 + 预计改动量
 - **跨项目影响检查**：后端改了 API → 前端是否要跟着调？数据库改了 → 其他服务是否依赖？方案里必须列出所有受影响的项目/模块
 - **数据库变更检查**：涉及实体/表结构改动时，方案必须包含 migration 脚本或 SQL 变更语句，不能只改代码不给出库脚本
-- 复杂方案写入 `<项目根>/.agent/plans/` 存档（见 ③，直接写文件，不走其他技能）
+- 复杂方案产出方案文本，**确认后**写入 `<项目根>/.agent/plans/`（见 ③）
 
-## ③ 用户确认
+## ③ 用户确认（DSH 原生闸门）
 
-- 方案给用户，等"可以"/"动手"/"确认"
-- 用户说改 → 回 ② 调方案
+- **复杂/多文件方案 → 用 plan mode**：通过 `exit_plan_mode` 把完整方案呈现给用户（approve / keep planning）。approve 后自动退出 plan mode 再动手；用户说改 → 回 ② 调方案再呈
+- **简单方案 → `ask_user_question`** 确认"可以 / 动手 / 确认"
 - **没说确认就不动手，可以补充分析但不出代码**
 
 ### 方案存档（防上下文丢失）
@@ -55,9 +52,10 @@ metadata:
 确认后、执行前，把最终方案写入**项目根目录**下的 `.agent/plans/`：
 
 - 路径 = `<项目根>/.agent/plans/YYYY-MM-DD_HHMMSS-<需求slug>.md`，如 `<your-project>/.agent/plans/...`
-- **目录不存在则创建**（`mkdir -p .agent/plans`）；**用户主目录（`~/.agent`）不是存档位置**
+- 目录不存在则创建（pwsh: `New-Item -ItemType Directory -Force .agent\plans`）；**用户主目录（`~/.agent`）不是存档位置**
 - 多项目混用统一工作区（如 `<workspace-root>`）时，若各项目无独立 .agent，可放工作区根，但必须在方案里写清绝对路径，防止 Spec 轴找错
 - 内容含：需求原文、改动清单、涉及文件、用户确认的要点。即使会话被压缩或跨天，从文件就能恢复上下文继续执行
+- 跨轮长目标另用 `create_goal` 持久化到会话外，与存档文件互为备份
 
 ## ④ 执行开发
 
@@ -67,23 +65,32 @@ metadata:
 
 **前置检查：确认工作区只含本次任务的改动。** `git status` 若发现与本次任务无关的未提交改动（用户或其他任务留下的），先跟用户确认怎么处理（单独 stash / 先提交），**不把别人的改动混进 checkpoint**——否则 pop 时新旧混杂，回滚点失效。
 
-```bash
-git stash push -u -m "pre-dev checkpoint $(date +%Y%m%d_%H%M%S)"
+```powershell
+git stash push -u -m ("pre-dev checkpoint " + (Get-Date -Format 'yyyyMMdd_HHmmss'))
 ```
 
 - `-u` 包含 untracked 新文件，防止新建的文件漏掉
 - 改崩了：`git stash pop` 零损失回滚
 - 不在 git 仓库的项目：改前备份关键文件到临时目录
+- **stash 栈安全**：后续跑基线/其他流程前先 `git stash list` 确认栈顶；栈顶不是自己的 stash 就用显式命名（`git stash push -m "baseline-<描述>"`），pop 用**精确 stash 名**，不赌栈顶；更稳：`git worktree add` 临时目录跑基线，完全不碰 stash stack。**pop 错对象 = 事故，宁慢勿赌**
 
 ### 执行
 
 - 按 ② 的分级执行
-- 改动前先读目标文件确认上下文，不盲改
-- 用 `patch`（精确替换）或 `write_file`（整文件重写）改代码
-- **执行中遇难缠 bug → 先建复现闭环**（联动 `systematic-debugging`）：失败测试 / curl / 最小复现，要求秒级、确定性、能抓住这个具体 bug；**无闭环不假设**，禁止边猜边改。修前先写回归测试；没有正确的测试接缝时，"没有接缝"本身记入交付说明
-- **并行任务文件隔离**：多个子代理并行时，拆分任务必须保证不交叉改同一文件；如果必须改同一文件，改为串行执行，后写的等前一个完成再改
+- 改动前先 `read` 目标文件确认上下文，不盲改（平台强制 read-before-write）
+- 用 `edit`（精确替换）或 `write`（整文件重写）改代码
+- 构建/测试用**后台任务**：`pwsh` 加 `run_in_background: true`，`job_output` 收集结果、`job_kill` 终止，不忙等轮询
+- **执行中遇难缠 bug → 先建复现闭环**（联动 `dsh-systematic-debugging`）：失败测试 / curl / 最小复现，要求秒级、确定性、能抓住这个具体 bug；**无闭环不假设**，禁止边猜边改。修前先写回归测试；没有正确的测试接缝时，"没有接缝"本身记入交付说明
 
-### subagent 派发防研究过度（2026-08-13 切片 4 两连踩坑定版）
+### 并行开发（DSH 版核心增强）
+
+DSH 同一条消息内多个 `subagent` 调用**并行执行**（默认 `maxParallelToolCalls = 10`），🔴 重型任务按垂直切片 fan-out：
+
+- **一条消息批量派发**：无阻塞关系的切片各派一个 subagent（目标、验收标准、涉及文件写进各自 prompt），全部一次发出并行跑；后台子代理启动后不占并发槽，可继续加派
+- **文件隔离铁律**：拆分任务必须保证不交叉改同一文件；必须改同一文件 → 改为串行，后写的等前一个完成再改（并行前提）
+- 切片间有依赖 → 按阻塞关系分批：批内并行、批间串行
+
+### subagent 派发防研究过度（Hermes 版四件套，DSH 同样适用）
 
 派 subagent 开发最容易翻车的不是写错，是**研究过度**——面对框架细节/样式惯例这类"未知"，subagent 倾向先研究透再动手（反编译 DLL、读 node_modules 内部源码、反复 grep 主题变量），几十次工具调用耗尽、代码没写完就到上限。四件套防：
 
@@ -100,20 +107,20 @@ git stash push -u -m "pre-dev checkpoint $(date +%Y%m%d_%H%M%S)"
 
 | 检查项 | 怎么查 |
 |---|---|
-| **编译/构建** | 跑 `dotnet build` / `npm run build` / 对应构建命令，确认零 error |
+| **编译/构建** | `dotnet build` / `npm run build` / 对应构建命令（后台任务），确认零 error |
 | **diff 范围** | `git diff` 看改了啥，有没有顺手改了不该改的 |
 | **逻辑正确** | 关键路径在脑子里跑一遍，边界条件想清楚 |
 | **安全** | 无硬编码密钥 / SQL 注入 / eval |
 | **无残留** | 没 debug print / console.log / 注释掉的废代码 |
 
-### 5.2 中等以上改动（🟡🔴）— 自动触发 `requesting-code-review` 技能（双轴审查）
+### 5.2 中等以上改动（🟡🔴）— 自动触发 `dsh-requesting-code-review` 技能（双轴审查）
 
-中等及以上改动，自审不只是我自己看 diff，**必须加载并执行 `requesting-code-review` 技能的完整流程，细节以该技能为唯一事实源**（本文不复制其步骤，防双份维护漂移）。其流程核心：
+中等及以上改动，自审不只是我自己看 diff，**必须加载并执行 `dsh-requesting-code-review` 技能的完整流程，细节以该技能为唯一事实源**（本文不复制其步骤，防双份维护漂移）。其流程核心：
 
 - 双轴审查，**报告分开呈现、不合并排名**——防止"代码写得很规范但做错了事"被掩盖
 - **Standards 轴**：代码质量 / 安全 / 规范（静态扫描 + 独立质量审查子代理）
 - **Spec 轴**：对照**需求原文**查缺需求 / 范围蔓延 / 领域错误；需求原文来自**项目根 `.agent/plans/`** 方案存档（见 ③，不含用户主目录）或对话中确认过的需求；没有需求原文时该轴明说"无 spec 可对照"，不硬编
-- 独立子代理判定（JSON 契约）→ 自动修复循环最多 2 轮，超 2 轮上报用户
+- 独立子代理判定（fail-closed JSON）→ 自动修复循环最多 2 轮，超 2 轮上报用户
 
 ### 5.3 通用检查项（所有级别都要过）
 
@@ -127,13 +134,13 @@ git stash push -u -m "pre-dev checkpoint $(date +%Y%m%d_%H%M%S)"
 交付内容：
 - **改动摘要**：改了哪些文件、每个文件改了什么（一句话）
 - **diff 或关键代码片段**（让用户能直接看）
-- **自审结论**：编译通过、审查结果（轻量=自查通过；中等以上=`requesting-code-review` 完整流程结论）
+- **自审结论**：编译通过、审查结果（轻量=自查通过；中等以上=`dsh-requesting-code-review` 完整流程结论）
 - **测试状况**：有测试→结果；无测试→明说"仅编译验证"
 - **风险提示**：如果有不确定的地方，明说
-- **初审问题 → 修复对照**（走过 auto-fix 时必附）：内容以 `requesting-code-review` Step 8 为唯一事实源（issues log 对照），此处不复制
+- **初审问题 → 修复对照**（走过 auto-fix 时必附）：内容以 `dsh-requesting-code-review` Step 8 为唯一事实源（issues log 对照），此处不复制
 
 **验收引导清单（随交付附上——"过目"的最低标准，不是可选项）**：
-- **审查相关项（🔴 打开 diff 核对关键文件、初审问题 → 修复说明对照）以 `requesting-code-review` Step 8 为唯一事实源，此处不复制，防双份维护漂移**
+- **审查相关项（🔴 打开 diff 核对关键文件、初审问题 → 修复说明对照）以 `dsh-requesting-code-review` Step 8 为唯一事实源，此处不复制，防双份维护漂移**
 - 风险提示：逐条确认是否接受
 - 测试状况：有测试看结果；无测试明确"仅编译验证"的接受度
 
@@ -144,14 +151,12 @@ git stash push -u -m "pre-dev checkpoint $(date +%Y%m%d_%H%M%S)"
 - **过 → 提交/推送执行前先经用户确认**（commit / push 等改变历史或远端状态的操作执行前必须用户确认，铁律 #2）；"过"= 按 ⑥ 的验收引导清单逐项核过，不是扫一眼"AI 说没问题"
 - **打回 → 说清哪里不对 → 回 ④ 改 → 重新自审 → 重新交付**，循环直到过
 
----
-
 ## 铁律
 
 1. **方案没确认不动手**
 2. **任何改变历史或远端状态的操作（commit / push / force push / reset --hard / branch -D / clean -fd / rebase / amend 等）执行前必须先经用户确认**（checkpoint 的 `git stash` / 基线用的 `git worktree` 属流程机制，除外）
 3. **自审必须真跑构建/测试，不靠"我觉得没问题"**
-4. **改之前先读文件，不盲改**
+4. **改之前先读文件，不盲改**（DSH 平台强制 read-before-write）
 5. **打回了就改到位，不糊弄**
 6. **动手前必须创建 checkpoint（git stash），改崩能回滚**
 7. **没有测试套件就明说，不假装测过了**

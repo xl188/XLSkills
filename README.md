@@ -1,6 +1,6 @@
-# XLSkills — Hermes Agent 技能集
+# XLSkills — Hermes Agent 技能集（含 DSH 版）
 
-一套面向 **Hermes Agent** 的开发工作流技能集，覆盖从需求到交付的完整闭环：
+一套面向 **Hermes Agent** 的开发工作流技能集，覆盖从需求到交付的完整闭环；**`dsh/` 目录提供 DeepSeek Harness (DSH) 原生适配版**（工具映射 + 并行化增强，见 [dsh/README.md](dsh/README.md)）。
 
 | 技能 | 作用 | 触发时机 |
 |---|---|---|
@@ -18,6 +18,8 @@
 
 ## 安装
 
+### Hermes
+
 克隆仓库后，将技能目录复制到 Hermes 的 skills 目录：
 
 ```bash
@@ -33,11 +35,21 @@ Copy-Item dev-pm-flow, requesting-code-review, systematic-debugging -Destination
 
 也可逐个导入 Hermes 桌面端：设置 → Skills → Import。
 
+### DeepSeek Harness (DSH)
+
+将 `dsh/` 下的三个技能复制到 DSH 技能根（用户级 `~/.dsh/skills/`，或项目级 `<项目根>/.dsh/skills/`）：
+
+```powershell
+Copy-Item dsh/dev-pm-flow, dsh/requesting-code-review, dsh/systematic-debugging -Destination "$env:USERPROFILE\.dsh\skills\" -Recurse
+```
+
+DSH 版的差异（工具映射 / 10 路并行子代理 / plan mode 确认闸门 / workflow 打包的双轴审查）见 [dsh/README.md](dsh/README.md)。
+
 ## 依赖
 
 - `requesting-code-review` 与 `dev-pm-flow` 相互联动（自审环节触发双轴审查）
-- 双轴审查通过 `delegate_task` 派发独立子代理，无需额外安装
-- `.NET/C#` 项目的静态扫描 pattern 库在 `requesting-code-review/references/dotnet.md`；其他技术栈可参照新增 `references/<stack>.md`
+- 双轴审查通过 `delegate_task` 派发独立子代理，无需额外安装（DSH 版为批量并行 `subagent` / `workflow`）
+- `.NET/C#` 项目的静态扫描 pattern 库在 `requesting-code-review/references/dotnet.md`，Hermes 版与 DSH 版**共用一份**（单一事实源，DSH 版用 `Select-String` 等价执行）；其他技术栈可参照新增 `references/<stack>.md`
 
 ## 目录结构
 
@@ -50,14 +62,22 @@ XLSkills/
 ├── requesting-code-review/
 │   ├── SKILL.md
 │   └── references/
-│       └── dotnet.md          # .NET/C#/SqlSugar 安全扫描 pattern 库
-└── systematic-debugging/
-    └── SKILL.md
+│       └── dotnet.md          # .NET/C#/SqlSugar 安全扫描 pattern 库（两版共用）
+├── systematic-debugging/
+│   └── SKILL.md
+└── dsh/                        # DeepSeek Harness 适配版
+    ├── README.md               # 工具映射 / 并行化设计 / 安装说明
+    ├── dev-pm-flow/SKILL.md
+    ├── requesting-code-review/
+    │   ├── SKILL.md
+    │   └── references/
+    │       └── dual-axis-review.md # 双轴审查 workflow 脚本（schema 强校验 + auto-fix 循环）
+    └── systematic-debugging/SKILL.md
 ```
 
 ## 贡献
 
-欢迎 PR。新增技术栈的审查 pattern 时，在 `requesting-code-review/references/` 下新增 `<stack>.md`，SKILL.md 的流程主体不动。
+欢迎 PR。新增技术栈的审查 pattern 时，在 `requesting-code-review/references/` 下新增 `<stack>.md`，SKILL.md 的流程主体不动；DSH 版同理复用该 pattern 库，不复制。
 
 ## License
 
