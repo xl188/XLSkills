@@ -1,7 +1,7 @@
 ---
 name: requesting-code-review
 description: "双轴 pre-commit review: Standards轴(安全/质量/规范) + Spec轴(对照需求查缺漏/蔓延/领域错误)，两轴分开报告。改动完成/commit前/交付前触发；🟡🔴改动由dev-pm-flow联动。"
-version: 2.3.4
+version: 2.4.0
 author: Hermes Agent (adapted from obra/superpowers + MorAlekss)
 license: MIT
 platforms: [linux, macos, windows]
@@ -142,7 +142,7 @@ the implementer. Fail-closed: unparseable response = fail.
 2. **范围蔓延** — 干了需求没让干的（多余功能/字段/重构）
 3. **领域错误** — 看着实现了，但实现逻辑与需求意图不符（这类是业务方最在意的领域问题，如「表单字段联动计算缺失」「状态流转条件与业务规则相反」）
 
-需求原文来源（按优先级）：项目根 `.hermes/plans/` 方案存档 → 对话中确认过的需求描述 → 用户传入的 spec/issue 文本。**存档位置规则以 dev-pm-flow ③ 为准：项目根目录（如 `<your-project>/.hermes/plans/...`），非用户主目录（`~/.hermes`）。** 没有需求原文时：跳过 Spec 轴，在最终报告中注明"无 spec 可对照"，绝不硬编一份需求出来。
+需求原文来源（按优先级）：项目根 `.agent/plans/` 方案存档 → 对话中确认过的需求描述 → 用户传入的 spec/issue 文本。**存档位置规则以 dev-pm-flow ③ 为准：项目根目录（如 `<your-project>/.agent/plans/...`），非用户主目录（`~/.agent`）。** 没有需求原文时：跳过 Spec 轴，在最终报告中注明"无 spec 可对照"，绝不硬编一份需求出来。
 
 Spec 子代理拿到的东西：需求原文全文 + diff 全文（贴进 context，禁止工具调用——子代理 60s 硬超时，靠自身检索会超）。
 
@@ -210,7 +210,7 @@ Find and report:
 Fail-closed: if any of the three categories is non-empty, passed must be false.
 
 <spec_source>
-[INSERT REQUIREMENT TEXT — from .hermes/plans/ or confirmed requirement]
+[INSERT REQUIREMENT TEXT — from .agent/plans/ or confirmed requirement]
 </spec_source>
 
 <code_changes>
@@ -287,6 +287,8 @@ Fix each issue precisely. Describe what you changed and why.""",
 )
 ```
 
+**fix agent 输出 = 交付材料**：它的逐条修复说明（每个问题 → 文件位置 → 改成什么样 → 为什么）必须原样保存为 **issues log**。Step 8 通过后这份 log 要原样附给用户——auto-fix 之后 final diff 里已无原始问题的痕迹，这是终审核对"原问题是什么、修得对不对"的唯一依据。禁止只写"已修复"。
+
 After the fix agent completes, re-run Steps 1-6 (full verification cycle).
 - Passed: proceed to Step 8
 - Failed and attempts < 2: repeat Step 7
@@ -298,7 +300,9 @@ After the fix agent completes, re-run Steps 1-6 (full verification cycle).
 If verification passed:
 
 - 报告验证结论（双轴均通过，可提交）
-- **绝不代劳 `git commit`**（dev-pm-flow 铁律 #2：commit 由用户手动）
+- **走过 auto-fix（Step 7）时，必须随报告附上「初审问题清单 → 修复说明」对照**（Step 7 保存的 issues log）——只报"双轴通过"而让用户面对干净的 final diff，终审就无从核对"原问题是什么、修得对不对"
+- **附验收引导**：🔴 改动（多文件/新模块/复杂算法）请用户**实际打开 diff 核对关键文件**，不只看摘要——初审报告不能代替人眼核 diff
+- **绝不代劳任何改变历史或远端状态的操作**（dev-pm-flow 铁律 #2：commit / push / force push / reset --hard / branch -D / clean -fd / rebase / amend 等均由用户手动；`git stash` / `git worktree` 属流程机制除外）
 - 可给出建议的 commit message 供用户使用，例如：`[verified] <description>`
 
 ## Reference: Common Patterns to Flag
@@ -334,4 +338,4 @@ tests exist, tests pass, no regressions.
 - **Auto-fix introduces new issues** — counts as a new failure, cycle continues
 - **未覆盖栈无内置 pattern** — pattern 库按 references/<栈>.md 组织；项目技术栈没有对应参考文件时，明说"该栈无内置 pattern"并手动补，绝不假装扫过
 - **双轴必须单次 tasks 数组发出** — 拆成两次 delegate_task 调用或串行等待 = 只有 1 个子代理在跑，双轴退化为单轴（实测教训）
-- **绝不 git commit** — 本技能只报告结论，commit 由用户手动（dev-pm-flow 铁律）
+- **绝不代劳改变历史/远端状态的操作** — 本技能只报告结论，commit / push / force push / reset --hard / branch -D 等由用户手动（dev-pm-flow 铁律 #2；`git stash` / `git worktree` 属流程机制除外）
