@@ -1,7 +1,7 @@
 ---
 name: requesting-code-review
 description: "双轴 pre-commit review: Standards轴(安全/质量/规范) + Spec轴(对照需求查缺漏/蔓延/领域错误)，两轴分开报告。改动完成/commit前/交付前触发；🟡🔴改动由dev-pm-flow联动。"
-version: 2.4.0
+version: 2.4.1
 author: Hermes Agent (adapted from obra/superpowers + MorAlekss)
 license: MIT
 platforms: [linux, macos, windows]
@@ -302,7 +302,7 @@ If verification passed:
 - 报告验证结论（双轴均通过，可提交）
 - **走过 auto-fix（Step 7）时，必须随报告附上「初审问题清单 → 修复说明」对照**（Step 7 保存的 issues log）——只报"双轴通过"而让用户面对干净的 final diff，终审就无从核对"原问题是什么、修得对不对"
 - **附验收引导**：🔴 改动（多文件/新模块/复杂算法）请用户**实际打开 diff 核对关键文件**，不只看摘要——初审报告不能代替人眼核 diff
-- **绝不代劳任何改变历史或远端状态的操作**（dev-pm-flow 铁律 #2：commit / push / force push / reset --hard / branch -D / clean -fd / rebase / amend 等均由用户手动；`git stash` / `git worktree` 属流程机制除外）
+- **任何改变历史或远端状态的操作（commit / push / force push / reset --hard / branch -D / clean -fd / rebase / amend 等）执行前必须先经用户确认**（dev-pm-flow 铁律 #2；`git stash` / `git worktree` 属流程机制除外）
 - 可给出建议的 commit message 供用户使用，例如：`[verified] <description>`
 
 ## Reference: Common Patterns to Flag
@@ -338,4 +338,4 @@ tests exist, tests pass, no regressions.
 - **Auto-fix introduces new issues** — counts as a new failure, cycle continues
 - **未覆盖栈无内置 pattern** — pattern 库按 references/<栈>.md 组织；项目技术栈没有对应参考文件时，明说"该栈无内置 pattern"并手动补，绝不假装扫过
 - **双轴必须单次 tasks 数组发出** — 拆成两次 delegate_task 调用或串行等待 = 只有 1 个子代理在跑，双轴退化为单轴（实测教训）
-- **绝不代劳改变历史/远端状态的操作** — 本技能只报告结论，commit / push / force push / reset --hard / branch -D 等由用户手动（dev-pm-flow 铁律 #2；`git stash` / `git worktree` 属流程机制除外）
+- **改变历史/远端状态的操作必须先经用户确认** — 本技能只报告结论，commit / push / force push / reset --hard / branch -D 等执行前必须用户确认（dev-pm-flow 铁律 #2；`git stash` / `git worktree` 属流程机制除外）

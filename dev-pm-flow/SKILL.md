@@ -1,7 +1,7 @@
 ---
 name: dev-pm-flow
 description: "开发 PM 流程：需求拆解(垂直切片)→方案→确认→执行→自审(双轴)→交付。用户提开发需求时触发。"
-version: 1.4.0
+version: 1.4.1
 author: 小艾
 platforms: [linux, macos, windows]
 metadata:
@@ -142,7 +142,7 @@ git stash push -u -m "pre-dev checkpoint $(date +%Y%m%d_%H%M%S)"
 
 ## ⑦ 发布 / 打回
 
-- **过 → 用户自己执行提交/推送**（commit / push 等改变历史或远端状态的操作一律用户手动，我不代劳，铁律 #2）；"过"= 按 ⑥ 的验收引导清单逐项核过，不是扫一眼"AI 说没问题"
+- **过 → 提交/推送执行前先经用户确认**（commit / push 等改变历史或远端状态的操作执行前必须用户确认，铁律 #2）；"过"= 按 ⑥ 的验收引导清单逐项核过，不是扫一眼"AI 说没问题"
 - **打回 → 说清哪里不对 → 回 ④ 改 → 重新自审 → 重新交付**，循环直到过
 
 ---
@@ -150,7 +150,7 @@ git stash push -u -m "pre-dev checkpoint $(date +%Y%m%d_%H%M%S)"
 ## 铁律
 
 1. **方案没确认不动手**
-2. **任何改变历史或远端状态的操作（commit / push / force push / reset --hard / branch -D / clean -fd / rebase / amend 等）均由用户手动执行，我绝不代劳**（checkpoint 的 `git stash` / 基线用的 `git worktree` 属流程机制，除外）
+2. **任何改变历史或远端状态的操作（commit / push / force push / reset --hard / branch -D / clean -fd / rebase / amend 等）执行前必须先经用户确认**（checkpoint 的 `git stash` / 基线用的 `git worktree` 属流程机制，除外）
 3. **自审必须真跑构建/测试，不靠"我觉得没问题"**
 4. **改之前先读文件，不盲改**
 5. **打回了就改到位，不糊弄**
