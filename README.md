@@ -1,6 +1,18 @@
 # XLSkills — Hermes Agent 技能集
 
-一套面向 **Hermes Agent** 的开发工作流技能集，覆盖从需求到交付的完整闭环：
+**Production-grade PM workflow skills for AI coding agents.** 一套面向 **Hermes Agent** 的开发工作流技能集，把资深工程师 + PM 的完整闭环（需求确认→方案→执行→双轴审查→交付）编码成可被 AI agent 自动加载执行的技能。
+
+```
+ 确认意图    拆解方案    用户确认    执行开发      双轴审查      交付验收
+ ┌───────┐   ┌───────┐   ┌───────┐   ┌───────┐   ┌───────┐   ┌───────┐
+ │ 需求  │──▶│ 方案  │──▶│ 拍板  │──▶│ 切片  │──▶│Standards│──▶│ 过目  │
+ │ Interview│  │垂直切片│   │ 等"可以" │   │ 增量  │   │ + Spec │   │ 验收  │
+ └───────┘   └───────┘   └───────┘   └───────┘   └───────┘   └───────┘
+  意图确认     方案存档      方案未确认     checkpoint     双轴分开      提交前
+  (轻量采访)   .agent/plans  绝不动手       git stash    不合并排名     用户确认
+```
+
+## 三件套
 
 | 技能 | 作用 | 触发时机 |
 |---|---|---|
@@ -15,6 +27,16 @@
 - **方案先确认后动手**：方案未确认绝不动手；方案存档到项目根 `.agent/plans/`，防上下文丢失
 - **铁律**：任何改变历史或远端状态的操作（commit / push / reset --hard 等）执行前必须经用户确认，agent 绝不擅自执行；没有测试套件就明说，不假装测过
 - **先闭环后假设**：调试必须先建可复现的 tight feedback loop，无闭环不猜原因
+
+## English Summary
+
+XLSkills is a set of production-grade **PM workflow skills for Hermes Agent** (and other AI coding agents). Three focused skills:
+
+- **dev-pm-flow** — requirements → plan → human confirmation → incremental execution → dual-axis review → delivery. Enforces human checkpoints, vertical slicing, and plan archiving.
+- **requesting-code-review** — dual-axis pre-commit review: Standards (security/quality) + Spec (spec-compliance). Independent subagents, fail-closed JSON verdicts, auto-fix loop.
+- **systematic-debugging** — 4-phase root-cause debugging: no fixes without a reproduction loop.
+
+Why XLSkills: agent doesn't verify its own work; review is adversarial and spec-aware; nothing touches git history without explicit human confirmation. Compare with other skill collections in [comparison.md](comparison.md).
 
 ## 安装
 
