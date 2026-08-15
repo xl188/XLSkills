@@ -39,18 +39,29 @@ Copy-Item dev-pm-flow, requesting-code-review, systematic-debugging -Destination
 - 双轴审查通过 `delegate_task` 派发独立子代理，无需额外安装
 - `.NET/C#` 项目的静态扫描 pattern 库在 `requesting-code-review/references/dotnet.md`；其他技术栈可参照新增 `references/<stack>.md`
 
+## 技能校验
+
+```bash
+python scripts/validate_skills.py   # 结构校验（强校验失败退出码 1）
+```
+
+强校验：每个技能有 `SKILL.md`、frontmatter 含 `name`+`description`、`name` 与目录名一致；弱校验（仅提示不挡）：`version` / `license` / 核心章节 / 触发词。纯标准库、无外部依赖，本地与 CI 皆可跑。
+
 ## 目录结构
 
 ```
 XLSkills/
 ├── README.md
 ├── LICENSE
+├── comparison.md          # 与主流 agent 技能集（agent-skills/Superpowers/Matt Pocock/Claude 官方）的对比
 ├── dev-pm-flow/
 │   └── SKILL.md
 ├── requesting-code-review/
 │   ├── SKILL.md
 │   └── references/
 │       └── dotnet.md          # .NET/C#/SqlSugar 安全扫描 pattern 库
+├── scripts/
+│   └── validate_skills.py     # 技能结构校验脚本（标准库，无依赖）
 └── systematic-debugging/
     └── SKILL.md
 ```

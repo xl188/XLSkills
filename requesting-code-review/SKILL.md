@@ -1,7 +1,7 @@
 ---
 name: requesting-code-review
 description: "双轴 pre-commit review: Standards轴(安全/质量/规范) + Spec轴(对照需求查缺漏/蔓延/领域错误)，两轴分开报告。改动完成/commit前/交付前触发；🟡🔴改动由dev-pm-flow联动。"
-version: 2.4.1
+version: 2.5.0
 author: Hermes Agent (adapted from obra/superpowers + MorAlekss)
 license: MIT
 platforms: [linux, macos, windows]
@@ -124,6 +124,10 @@ Quick scan before dispatching the reviewer:
 - [ ] No debug print/console.log left behind
 - [ ] No commented-out code
 - [ ] New code has tests (if test suite exists)
+- [ ] **依赖纪律**（改动新增/升级了依赖时检查）：
+  - 新增依赖：现有栈能否解决？查过体积影响、维护状态、已知漏洞、许可证吗？
+  - 依赖升级：读过 changelog 吗（semver 不保证无破坏）？按包隔离升级（不批量 bump）吗？升级靠绿色套件验证而非"装上去了"？
+  - 锁文件 / csproj 依赖 diff：传递依赖变化审了吗？（大多数已装包没人是直接选的）
 
 ## Step 5 — Independent reviewer subagents (双轴并行)
 
@@ -160,6 +164,13 @@ FAIL-CLOSED RULES:
 - logic_errors non-empty -> passed must be false
 - Cannot parse diff -> passed must be false
 - Only set passed=true when BOTH lists are empty
+
+ADVERSARIAL FRAME: Assume the author is overconfident. Actively look for:
+unstated assumptions, edge cases not handled, hidden coupling or shared state,
+ways the contract could be violated, conventions this might break, failure
+modes under unexpected input. Do NOT validate. Do NOT rubber-stamp. Find
+issues, or state explicitly that you cannot find any after thorough
+examination. An empty result is only acceptable after real scrutiny.
 
 SECURITY (auto-FAIL): hardcoded secrets, backdoors, data exfiltration,
 SQL injection (拼接/插值进 SQL 的裸查询), 危险反序列化, 危险进程执行,
@@ -257,6 +268,17 @@ Spec unavailable: [state explicitly if Spec axis was skipped]
 
 **All passed (both axes):** Proceed to Step 8 (commit).
 **Any failures:** Report what failed per axis, then proceed to Step 7 (auto-fix).
+
+## Step 6.5 — 发现分类（RECONCILE，auto-fix 前必做）
+
+审查者的输出是**数据，不是裁决**。进 Step 7 前，对每条发现对照 diff / 需求原文重新审视后分类（先匹配的类胜出），**别照单全收**——照单全收 = 把噪音和误报也拿去改，可能改坏用户有意的代码：
+
+1. **契约误读** — 审查者因 prompt / 需求原文不清而误报。修 context 重新派发，**不进 fix**
+2. **有效 + 可行动** — 真问题需改动。**进 fix agent**
+3. **有效权衡** — 问题真，但修复成本 > 接受成本（或用户显式要的 trade-off）。记录给用户看，**不进 fix**
+4. **噪音** — 审查者缺上下文误报。忽略，并问：把那段上下文补进 prompt 能防这次误报吗？
+
+分类结果随 issues log 一起给用户（Step 8），让"哪些改了 / 哪些判为误报没改"透明。rubber-stamping 审查者（不重读工件直接照单全收）和忽略它同是失败模式。
 
 ## Step 7 — Auto-fix loop
 
