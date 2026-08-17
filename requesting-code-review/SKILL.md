@@ -1,7 +1,7 @@
 ---
 name: requesting-code-review
 description: "双轴 pre-commit review: Standards轴(安全/质量/规范) + Spec轴(对照需求查缺漏/蔓延/领域错误)，两轴分开报告。改动完成/commit前/交付前触发；🟡🔴改动由dev-pm-flow联动。"
-version: 2.5.0
+version: 2.5.1
 author: Hermes Agent (adapted from obra/superpowers + MorAlekss)
 license: MIT
 platforms: [linux, macos, windows]
@@ -132,7 +132,7 @@ Quick scan before dispatching the reviewer:
 ## Step 5 — Independent reviewer subagents (双轴并行)
 
 Call `delegate_task` directly — it is NOT available inside execute_code or scripts.
-**必须单次 `delegate_task(tasks=[...])` batch 调用同时派发双轴（5a 与 5b 是 tasks 数组的两个元素），禁止拆成两次独立 `delegate_task` 调用或串行等待**——拆开调用会导致实际只有 1 个子代理在跑，双轴审查退化为单轴（实测教训）。两个审查子代理上下文互相隔离，报告分开呈现、不合并排名——防止"代码写得很规范但做错了事"被掩盖（mattpocock/skills 双轴审查设计）。审查子代理**不传 toolsets**（diff 与扫描结果已贴进 context，禁止工具调用；且子代理有 60s 硬超时，自身检索会超）。
+**必须单次 `delegate_task(tasks=[...])` batch 调用同时派发双轴（5a 与 5b 是 tasks 数组的两个元素），禁止拆成两次独立 `delegate_task` 调用或串行等待**——拆开调用会导致实际只有 1 个子代理在跑，双轴审查退化为单轴（实测教训）。两个审查子代理上下文互相隔离，报告分开呈现、不合并排名——防止"代码写得很规范但做错了事"被掩盖（mattpocock/skills 双轴审查设计）。审查子代理**不传 toolsets**（diff 与扫描结果已贴进 context，禁止工具调用；且子代理有 120s 硬超时，自身检索会超）。
 
 ### 5a. Standards 轴 — 独立质量/安全审查
 
@@ -148,7 +148,12 @@ the implementer. Fail-closed: unparseable response = fail.
 
 需求原文来源（按优先级）：项目根 `.agent/plans/` 方案存档 → 对话中确认过的需求描述 → 用户传入的 spec/issue 文本。**存档位置规则以 dev-pm-flow ③ 为准：项目根目录（如 `<your-project>/.agent/plans/...`），非用户主目录（`~/.agent`）。** 没有需求原文时：跳过 Spec 轴，在最终报告中注明"无 spec 可对照"，绝不硬编一份需求出来。
 
-Spec 子代理拿到的东西：需求原文全文 + diff 全文（贴进 context，禁止工具调用——子代理 60s 硬超时，靠自身检索会超）。
+Spec 子代理拿到的东西：需求原文全文 + diff 全文（贴进 context，禁止工具调用——子代理 120s 硬超时，靠自身检索会超）。
+
+**派发前检查（硬约束，缺一不可）：**
+- **占位符必须全部替换**：模板中 `<code_changes>`、`<static_scan_results>`、`<spec_source>`、`<stack_specific_security_guidance>` 等尖括号占位必须替换为实际内容（无内容写"无"）——**未展开的 `<xxx>` 占位会触发 delegate_task 拒派（unexpanded template marker），模板不可原样发出**
+- **并发上限**：本环境 batch 并行上限 3（`delegation.max_concurrent_children`）。双轴 = 2 个，安全；**大 diff（>15KB）需按文件组拆分派发时，组数 × 2 ≤ 3（即最多 1 组）**，超出部分自己静态扫描或分轮派发，不可一次超发
+- **超时兜底**：审查子代理有 120s 硬超时（`delegation.child_timeout_seconds`）。超时 / 无有效 JSON 返回时：**实现者按双轴 checklist 人工自审，禁止反复重派**（重派大概率继续超时）
 
 **单次 batch 调用（双轴合并为一个 tasks 数组，照抄此结构，一次发出）：**
 
@@ -308,6 +313,8 @@ Fix each issue precisely. Describe what you changed and why.""",
     toolsets=["terminal", "file"]
 )
 ```
+
+**fix agent 超时兜底**：fix agent 同样受 120s 硬超时约束；超时 / 未完成时，实现者按 issues log 逐条自己修（不要反复重派）。
 
 **fix agent 输出 = 交付材料**：它的逐条修复说明（每个问题 → 文件位置 → 改成什么样 → 为什么）必须原样保存为 **issues log**。Step 8 通过后这份 log 要原样附给用户——auto-fix 之后 final diff 里已无原始问题的痕迹，这是终审核对"原问题是什么、修得对不对"的唯一依据。禁止只写"已修复"。
 
